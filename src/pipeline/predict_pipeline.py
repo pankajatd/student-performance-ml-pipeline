@@ -57,6 +57,18 @@ class PredictPipeline:
 
             # Ensure column order
             features = features[expected_columns]
+            
+            # Compatibility patch for SimpleImputer pickled with older scikit-learn
+            for _, transformer, _ in getattr(preprocessor, "transformers_", []):
+                if hasattr(transformer, "named_steps"):
+                    for _, step in transformer.named_steps.items():
+                        if step.__class__.__name__ == "SimpleImputer" and not hasattr(step, "_fill_dtype"):
+                            stats = getattr(step, "statistics_", None)
+                            step._fill_dtype = stats.dtype if stats is not None else object
+                elif transformer.__class__.__name__ == "SimpleImputer" and not hasattr(transformer, "_fill_dtype"):
+                    stats = getattr(transformer, "statistics_", None)
+                    transformer._fill_dtype = stats.dtype if stats is not None else object
+
             try:    
                 data_scaled=preprocessor.transform(features)
             except Exception as transform_err:
